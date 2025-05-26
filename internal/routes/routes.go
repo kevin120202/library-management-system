@@ -10,8 +10,10 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 	r.Get("/api/health", app.HealthCheck)
 
-	r.Get("/api/book/{id}", app.BookHandler.HandleGetBookByID)
-	r.Post("/api/book", app.BookHandler.HandleCreateBook)
+	r.Post("/api/users", app.UserHandler.HandleRegisterUser)
+
+	r.Get("/api/books/{id}", app.BookHandler.HandleGetBookByID)
+	r.Post("/api/books", app.BookHandler.HandleCreateBook)
 
 	return r
 }
