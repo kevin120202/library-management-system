@@ -1,6 +1,7 @@
 package store
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -68,6 +69,7 @@ func NewPostgresUserStore(db *sql.DB) *PostgresUserStore {
 type UserStore interface {
 	CreateUser(*User) error
 	GetUserByUsername(username string) (*User, error)
+	GetUserToken(scope, plainTextPassword string) (*User, error)
 }
 
 func (s *PostgresUserStore) CreateUser(user *User) error {
@@ -96,6 +98,40 @@ func (s *PostgresUserStore) GetUserByUsername(username string) (*User, error) {
 	`
 
 	err := s.db.QueryRow(query, username).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash.hash, &user.AccountType, &user.Address, &user.CreatedAt, &user.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *PostgresUserStore) GetUserToken(scope, plainTextPassword string) (*User, error) {
+	tokenHash := sha256.Sum256([]byte(plainTextPassword))
+	query := `
+		SELECT users.id, users.username, users.password_hash, users.account_type, users.address, users.created_at, users.updated_at FROM users
+		INNER JOIN tokens ON tokens.user_id = users.id
+		WHERE tokens.hash = $1 AND tokens.scope = $2 AND tokens.expiry > $3
+	`
+
+	user := &User{
+		PasswordHash: password{},
+	}
+
+	err := s.db.QueryRow(query, tokenHash[:], scope, time.Now()).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.PasswordHash.hash,
+		&user.AccountType,
+		&user.Address,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
