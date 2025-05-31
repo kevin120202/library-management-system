@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kevin120202/library-management-system/internal/middleware"
 	"github.com/kevin120202/library-management-system/internal/store"
 	"github.com/kevin120202/library-management-system/internal/utils"
 )
@@ -21,14 +22,16 @@ type registerUserRequest struct {
 }
 
 type UserHandler struct {
-	userStore store.UserStore
-	logger    *log.Logger
+	userStore  store.UserStore
+	tokenStore store.TokenStore
+	logger     *log.Logger
 }
 
-func NewUserHandler(userStore store.UserStore, logger *log.Logger) *UserHandler {
+func NewUserHandler(userStore store.UserStore, tokenStore store.TokenStore, logger *log.Logger) *UserHandler {
 	return &UserHandler{
-		userStore: userStore,
-		logger:    logger,
+		userStore:  userStore,
+		tokenStore: tokenStore,
+		logger:     logger,
 	}
 }
 
@@ -96,4 +99,22 @@ func (h *UserHandler) HandleRegisterUser(w http.ResponseWriter, r *http.Request)
 	}
 
 	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{"user": user})
+}
+
+func (h *UserHandler) HandleLogoutUser(w http.ResponseWriter, r *http.Request) {
+	currentUser := middleware.GetUser(r)
+
+	if currentUser == nil || currentUser == store.AnonymousUser {
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "you must be logged in"})
+		return
+	}
+
+	err := h.tokenStore.DeleteAllTokensForUser(currentUser.ID, currentUser.AccountType)
+	if err != nil {
+		h.logger.Printf("ERROR: HandleLogoutUser: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "failed to lougout"})
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"Logout": true})
 }

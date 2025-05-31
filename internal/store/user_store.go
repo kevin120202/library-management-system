@@ -69,7 +69,7 @@ func NewPostgresUserStore(db *sql.DB) *PostgresUserStore {
 type UserStore interface {
 	CreateUser(*User) error
 	GetUserByUsername(username string) (*User, error)
-	GetUserToken(scope, plainTextPassword string) (*User, error)
+	GetUserToken(plainTextPassword string) (*User, error)
 }
 
 func (s *PostgresUserStore) CreateUser(user *User) error {
@@ -109,19 +109,19 @@ func (s *PostgresUserStore) GetUserByUsername(username string) (*User, error) {
 	return user, nil
 }
 
-func (s *PostgresUserStore) GetUserToken(scope, plainTextPassword string) (*User, error) {
+func (s *PostgresUserStore) GetUserToken(plainTextPassword string) (*User, error) {
 	tokenHash := sha256.Sum256([]byte(plainTextPassword))
 	query := `
-		SELECT users.id, users.username, users.password_hash, users.account_type, users.address, users.created_at, users.updated_at FROM users
+		SELECT users.id, users.username, users.email, users.password_hash, users.account_type, users.address, users.created_at, users.updated_at FROM users
 		INNER JOIN tokens ON tokens.user_id = users.id
-		WHERE tokens.hash = $1 AND tokens.scope = $2 AND tokens.expiry > $3
+		WHERE tokens.hash = $1 AND tokens.expiry > $2
 	`
 
 	user := &User{
 		PasswordHash: password{},
 	}
 
-	err := s.db.QueryRow(query, tokenHash[:], scope, time.Now()).Scan(
+	err := s.db.QueryRow(query, tokenHash[:], time.Now()).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
@@ -133,10 +133,12 @@ func (s *PostgresUserStore) GetUserToken(scope, plainTextPassword string) (*User
 	)
 
 	if err == sql.ErrNoRows {
+		fmt.Print("sql.ErrNoRows")
 		return nil, nil
 	}
 
 	if err != nil {
+		fmt.Printf("ERROR: GetUserToken %v", err)
 		return nil, err
 	}
 
