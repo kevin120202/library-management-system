@@ -29,6 +29,9 @@ func NewTokenHandler(tokenstore store.TokenStore, userStore store.UserStore, log
 	}
 }
 
+// @desc    Create a token
+// @route   POST /api/authentication
+// @access  Private
 func (h *TokenHandler) HandleCreateToken(w http.ResponseWriter, r *http.Request) {
 	var req createTokenRequest
 	err := json.NewDecoder(r.Body).Decode(&req)

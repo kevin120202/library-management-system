@@ -62,6 +62,9 @@ func (h *UserHandler) validateRegisterRequest(req *registerUserRequest) error {
 	return nil
 }
 
+// @desc    Create a user
+// @route   POST /api/users
+// @access  Public
 func (h *UserHandler) HandleRegisterUser(w http.ResponseWriter, r *http.Request) {
 	var req registerUserRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -101,6 +104,9 @@ func (h *UserHandler) HandleRegisterUser(w http.ResponseWriter, r *http.Request)
 	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{"user": user})
 }
 
+// @desc    Logout a user
+// @route   POST /api/logout
+// @access  Private
 func (h *UserHandler) HandleLogoutUser(w http.ResponseWriter, r *http.Request) {
 	currentUser := middleware.GetUser(r)
 
