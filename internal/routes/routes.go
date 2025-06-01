@@ -13,6 +13,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 		r.Get("/api/books/{id}", app.Middleware.RequireUser(app.BookHandler.HandleGetBookByID))
 		r.Post("/api/books", app.Middleware.RequireUser(app.BookHandler.HandleCreateBook))
+		r.Post("/api/books/{id}", app.Middleware.RequireUser(app.BookHandler.HandleUpdateBookByID))
 
 		r.Post("/api/logout", app.UserHandler.HandleLogoutUser)
 	})

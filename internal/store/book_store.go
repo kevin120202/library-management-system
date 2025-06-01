@@ -25,8 +25,8 @@ func NewPostgresBookStore(db *sql.DB) *PostgresBookStore {
 type BookStore interface {
 	CreateBook(*Book) (*Book, error)
 	GetBookByID(id int64) (*Book, error)
-	// UpdateBook(*Book) error
-	// DeleteBook(id int64) error
+	UpdateBook(*Book) error
+	DeleteBook(id int64) error
 }
 
 func (pg *PostgresBookStore) CreateBook(book *Book) (*Book, error) {
@@ -73,4 +73,57 @@ func (pg *PostgresBookStore) GetBookByID(id int64) (*Book, error) {
 	}
 
 	return book, nil
+}
+
+func (pg *PostgresBookStore) UpdateBook(book *Book) error {
+	tx, err := pg.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `
+		UPDATE books
+		SET title = $1, author = $2, summary = $3
+		WHERE id = $4
+	`
+
+	result, err := tx.Exec(query, book.Title, book.Author, book.Summary, book.ID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return tx.Commit()
+}
+
+func (pg *PostgresBookStore) DeleteBook(id int64) error {
+	query := `
+		DELETE from books
+		WHERE id = $1
+	`
+
+	result, err := pg.db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
