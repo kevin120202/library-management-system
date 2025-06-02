@@ -24,9 +24,11 @@ func NewPostgresBookStore(db *sql.DB) *PostgresBookStore {
 
 type BookStore interface {
 	CreateBook(*Book) (*Book, error)
+	GetBooks() ([]Book, error)
 	GetBookByID(id int64) (*Book, error)
 	UpdateBook(*Book) error
 	DeleteBook(id int64) error
+	BorrowBook(bookID int64, userID int64) (error)
 }
 
 func (pg *PostgresBookStore) CreateBook(book *Book) (*Book, error) {
@@ -53,6 +55,36 @@ func (pg *PostgresBookStore) CreateBook(book *Book) (*Book, error) {
 	}
 
 	return book, nil
+}
+
+func (pg *PostgresBookStore) GetBooks() ([]Book, error) {
+	var books []Book
+
+	query := `
+		SELECT id, title, author, summary, created_at, updated_at FROM books
+	`
+
+	rows, err := pg.db.Query(query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var book Book
+		err := rows.Scan(
+			&book.ID, &book.Title, &book.Author, &book.Summary, &book.CreatedAt, &book.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		books = append(books, book)
+	}
+
+	return books, nil
 }
 
 func (pg *PostgresBookStore) GetBookByID(id int64) (*Book, error) {
@@ -126,4 +158,68 @@ func (pg *PostgresBookStore) DeleteBook(id int64) error {
 	}
 
 	return nil
+}
+
+func (pg *PostgresBookStore) BorrowBook(bookID int64, userID int64) (error) {
+	tx, err := pg.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `
+		INSERT INTO borrows_returns (book_id, user_id)
+		VALUES ($1, $2)
+	`
+	_, err = tx.Exec(query, bookID, userID)
+	if err != nil {
+		return err
+	}
+
+	updateQuery := `
+		UPDATE books
+		SET availability_status = 'borrowed'
+		WHERE id = $1
+	`
+
+	_, err = tx.Exec(updateQuery, bookID, userID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (pg *PostgresBookStore) CheckIsBookAvailable(bookID int64) (*string, error) {
+	return nil,nil
+	// tx, err := pg.db.Begin()
+	// if err != nil {
+	// 	return err
+	// }
+	// defer tx.Rollback()
+
+	// var availabilityStatus string;
+
+	// query := `SELECT availability_status FROM books WHERE $1`
+	// err = tx.QueryRow(query, bookID).Scan(&availabilityStatus)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// if availabilityStatus == "borrowed" {
+	// 	return 
+	// }
+
+
+	// err = tx.Commit()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// return nil
 }

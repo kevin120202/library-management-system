@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -43,6 +44,20 @@ func (bh *BookHandler) HandleGetBookByID(w http.ResponseWriter, r *http.Request)
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"book": book})
 }
 
+// @desc    Get books
+// @route   Get /api/books
+// @access  Public
+func (bh *BookHandler) HandleGetBooks(w http.ResponseWriter, r *http.Request) {
+	books, err := bh.BookStore.GetBooks()
+	if err != nil {
+		bh.Logger.Printf("ERROR: getBooks: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "internal server error"})
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"books": books})
+}
+
 // @desc    Create a book
 // @route   POST /api/books
 // @access  Admin
@@ -78,7 +93,7 @@ func (bh *BookHandler) HandleCreateBook(w http.ResponseWriter, r *http.Request) 
 }
 
 // @desc    Update a book
-// @route   POST /api/books/{id}
+// @route   PUT /api/books/{id}
 // @access  Admin
 func (bh *BookHandler) HandleUpdateBookByID(w http.ResponseWriter, r *http.Request) {
 	bookID, err := utils.ReadIDParam(r)
@@ -142,4 +157,71 @@ func (bh *BookHandler) HandleUpdateBookByID(w http.ResponseWriter, r *http.Reque
 	}
 
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"book": existingBook})
+}
+
+// @desc    Delete a book
+// @route   DELETE /api/books/{id}
+// @access  Admin
+func (bh *BookHandler) HandleDeleteBookByID(w http.ResponseWriter, r *http.Request) {
+	bookID, err := utils.ReadIDParam(r)
+	if err != nil {
+		bh.Logger.Printf("ERROR: readIDParam: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid workout id"})
+		return
+	}
+
+	currentUser := middleware.GetUser(r)
+	if currentUser == nil || currentUser == store.AnonymousUser {
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "you must be logged in"})
+		return
+	}
+
+	if currentUser.AccountType != "admin" {
+		utils.WriteJSON(w, http.StatusForbidden, utils.Envelope{"error": "you are not authorized to create a book"})
+		return
+	}
+
+	err = bh.BookStore.DeleteBook(bookID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "workout not found", http.StatusNotFound)
+		return
+	}
+
+	if err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "error deleting workout"})
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusNoContent, utils.Envelope{"updated": true})
+}
+
+// @desc    Borrow a book
+// @route   POST /api/books/{id}
+// @access  Private
+func (bh *BookHandler) HandleBorrowBook(w http.ResponseWriter, r *http.Request) {
+	bookID, err := utils.ReadIDParam(r)
+	if err != nil {
+		bh.Logger.Printf("ERROR: readIDParam: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "invalid workout id"})
+		return
+	}
+
+	currentUser := middleware.GetUser(r)
+	if currentUser == nil || currentUser == store.AnonymousUser {
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "you must be logged in"})
+		return
+	}
+
+	err = bh.BookStore.BorrowBook(bookID, int64(currentUser.ID))
+	if err != nil {
+		bh.Logger.Printf(w, "ERROR: HandleBorrowBook: %v", err)
+		return
+	}
+
+	if err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"error": "error deleting workout"})
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusNoContent, utils.Envelope{"updated": true})
 }
